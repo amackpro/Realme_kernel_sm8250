@@ -207,9 +207,6 @@ int swappiness_threshold2_size = 0;
  */
 int direct_vm_swappiness = 60;
 #endif /*OPLUS_FEATURE_ZRAM_OPT*/
-#ifdef CONFIG_HYBRIDSWAP_SWAPD
-static int hybridswapd_swappiness = 200;
-#endif
 
 /*
  * The total number of pages which are beyond the high watermark within all
@@ -1606,43 +1603,6 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 	return ret;
 }
 
-#if defined(CONFIG_NANDSWAP)
-unsigned long nswap_reclaim_page_list(struct list_head *page_list,
-					struct vm_area_struct *vma, bool scan)
-{
-	unsigned long nr_reclaimed;
-	unsigned long nr_scan = 0;
-	struct page *page;
-	struct scan_control sc = {
-		.gfp_mask = GFP_KERNEL,
-		.priority = DEF_PRIORITY,
-		.may_writepage = 1,
-		.may_unmap = 1,
-		.may_swap = 1,
-		.target_vma = vma,
-	};
-
-	list_for_each_entry(page, page_list, lru) {
-		ClearPageActive(page);
-	}
-
-	nr_reclaimed = shrink_page_list(page_list, NULL, &sc,
-			TTU_IGNORE_ACCESS, NULL, true);
-
-	while (!list_empty(page_list)) {
-		page = lru_to_page(page_list);
-		if (PageSwapCache(page) && !PageDirty(page))
-			nr_scan++;
-		list_del(&page->lru);
-		dec_node_page_state(page, NR_ISOLATED_ANON +
-				page_is_file_cache(page));
-		putback_lru_page(page);
-	}
-
-	return scan ? nr_scan : nr_reclaimed;
-}
-#endif
-
 #ifdef CONFIG_PROCESS_RECLAIM
 #if defined(OPLUS_FEATURE_PROCESS_RECLAIM) && defined(CONFIG_PROCESS_RECLAIM_ENHANCE)
 unsigned long reclaim_pages_from_list(struct list_head *page_list,
@@ -2438,14 +2398,6 @@ enum scan_balance {
 	SCAN_FILE,
 };
 
-#ifdef CONFIG_HYBRIDSWAP_SWAPD
-extern bool free_swap_is_low(void);
-bool __weak free_swap_is_low(void)
-{
-	return false;
-}
-#endif
-
 /*
  * Determine how aggressively the anon and file LRU lists should be
  * scanned.  The relative value of each set of LRU lists is determined
@@ -2470,21 +2422,9 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	unsigned long ap, fp;
 	enum lru_list lru;
 	unsigned long totalswap = total_swap_pages;
-#if defined(CONFIG_NANDSWAP)
-	if (nandswap_si)
-		totalswap -= nandswap_si->pages;
-#endif
-
 
 #if defined(OPLUS_FEATURE_ZRAM_OPT) && defined(CONFIG_OPLUS_ZRAM_OPT)
 	if (!current_is_kswapd()) {
-#ifdef CONFIG_HYBRIDSWAP_SWAPD
-		if (strncmp(current->comm, "hybridswapd:", sizeof("hybridswapd:") - 1) == 0) {
-			swappiness = hybridswapd_swappiness;
-			if (free_swap_is_low())
-				swappiness = 0;
-		} else
-#endif
 			swappiness = direct_vm_swappiness;
 	}
 #ifdef CONFIG_DYNAMIC_TUNNING_SWAPPINESS
@@ -4624,115 +4564,3 @@ void check_move_unevictable_pages(struct page **pages, int nr_pages)
 	}
 }
 #endif /* CONFIG_SHMEM */
-
-#ifdef CONFIG_HYBRIDSWAP_SWAPD
-#define PARA_BUF_LEN 128
-
-static inline bool debug_get_val(char *buf, char *token, unsigned long *val)
-{
-	int ret = -EINVAL;
-	char *str = strstr(buf, token);
-
-	if (!str)
-		return ret;
-
-	ret = kstrtoul(str + strlen(token), 0, val);
-	if (ret)
-		return -EINVAL;
-
-	if (*val > 200) {
-		pr_err("%lu is invalid\n", *val);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static ssize_t swappiness_para_write(struct file *file,
-		const char __user *buff, size_t len, loff_t *ppos)
-{
-	char kbuf[PARA_BUF_LEN] = {'0'};
-	char *str;
-	long val;
-
-	if (len > PARA_BUF_LEN - 1) {
-		pr_err("len %d is too long\n", len);
-		return -EINVAL;
-	}
-
-	if (copy_from_user(&kbuf, buff, len))
-		return -EFAULT;
-	kbuf[len] = '\0';
-
-	str = strstrip(kbuf);
-	if (!str) {
-		pr_err("buff %s is invalid\n", kbuf);
-		return -EINVAL;
-	}
-
-	if (!debug_get_val(str, "vm_swappiness=", &val)) {
-		vm_swappiness = val;
-		return len;
-	}
-
-	if (!debug_get_val(str, "direct_swappiness=", &val)) {
-		direct_vm_swappiness = val;
-		return len;
-	}
-
-	if (!debug_get_val(str, "swapd_swappiness=", &val)) {
-		hybridswapd_swappiness = val;
-		return len;
-	}
-
-	return -EINVAL;
-}
-
-static ssize_t swappiness_para_read(struct file *file,
-		char __user *buffer, size_t count, loff_t *off)
-{
-	char kbuf[PARA_BUF_LEN] = {'0'};
-	int len;
-
-	len = snprintf(kbuf, PARA_BUF_LEN, "vm_swappiness: %d\n", vm_swappiness);
-	len += snprintf(kbuf + len, PARA_BUF_LEN - len,
-			"direct_swappiness: %d\n", direct_vm_swappiness);
-	len += snprintf(kbuf + len, PARA_BUF_LEN - len,
-			"swapd_swappiness: %d\n", hybridswapd_swappiness);
-
-	if (len == PARA_BUF_LEN)
-		kbuf[len - 1] = '\0';
-
-	if (len > *off)
-		len -= *off;
-	else
-		len = 0;
-
-	if (copy_to_user(buffer, kbuf + *off, (len < count ? len : count)))
-		return -EFAULT;
-
-	*off += (len < count ? len : count);
-	return (len < count ? len : count);
-}
-
-static const struct file_operations proc_swappiness_para_ops = {
-	.write          = swappiness_para_write,
-	.read		= swappiness_para_read,
-};
-
-int create_swappiness_para_proc(void)
-{
-	struct proc_dir_entry * para_entry =
-		proc_create("oplus_healthinfo/swappiness_para",
-				S_IRUSR|S_IWUSR, NULL, &proc_swappiness_para_ops);
-
-	if (para_entry) {
-		printk("Register swappiness_para interface passed.\n");
-		return 0;
-	}
-
-	pr_err("Register swappiness_para interface failed.\n");
-	return -ENOMEM;
-}
-EXPORT_SYMBOL(create_swappiness_para_proc);
-#endif

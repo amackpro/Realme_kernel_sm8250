@@ -156,8 +156,8 @@ static unsigned long long_max = LONG_MAX;
 static int one_hundred = 100;
 #if defined(OPLUS_FEATURE_ZRAM_OPT) && defined(CONFIG_OPLUS_ZRAM_OPT)
 extern int direct_vm_swappiness;
+#endif
 static int two_hundred = 200;
-#endif /*OPLUS_FEATURE_ZRAM_OPT*/
 
 #ifdef OPLUS_FEATURE_EDTASK_IMPROVE
 int sysctl_ed_task_enabled = 1;
@@ -1969,11 +1969,7 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
-#if defined(OPLUS_FEATURE_ZRAM_OPT) && defined(CONFIG_OPLUS_ZRAM_OPT)
 		.extra2		= &two_hundred,
-#else
-		.extra2		= &one_hundred,
-#endif /*OPLUS_FEATURE_ZRAM_OPT*/
 	},
 #ifdef CONFIG_DYNAMIC_TUNNING_SWAPPINESS
 	{

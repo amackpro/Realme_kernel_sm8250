@@ -1073,10 +1073,6 @@ extern int __weak create_vmalloc_debug(struct proc_dir_entry *parent);
 #ifdef CONFIG_VIRTUAL_RESERVE_MEMORY
 int create_reserved_area_enable_proc(struct proc_dir_entry *parent);
 #endif
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) && IS_BUILTIN(CONFIG_OPLUS_FEATURE_ZRAM_OPT)) \
-	|| ((LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)) && defined(CONFIG_HYBRIDSWAP_SWAPD))
-extern int create_swappiness_para_proc(void);
-#endif
 static int __init healthinfo_init(void)
 {
 	int ret = 0;
@@ -1248,13 +1244,6 @@ static int __init healthinfo_init(void)
 
 #ifdef CONFIG_KSWAPD_DEBUG_STATISTICS
 	ret = kswapd_debug_init(healthinfo);
-	if (ret)
-		goto ERROR_INIT_VERSION;
-#endif
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) && IS_BUILTIN(CONFIG_OPLUS_FEATURE_ZRAM_OPT)) \
-	|| ((LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)) && defined(CONFIG_HYBRIDSWAP_SWAPD))
-	ret = create_swappiness_para_proc();
 	if (ret)
 		goto ERROR_INIT_VERSION;
 #endif

@@ -68,7 +68,4 @@ obj-$(CONFIG_OPLUS_FEATURE_IM) += oplus/im/
 obj-$(CONFIG_OPLUS_FEATURE_TPD)     +=  oplus/tpd/
 #endif
 
-#Add for NandSwap
-obj-$(CONFIG_NANDSWAP)		+= oplus/oplus_nandswap/
-
 
