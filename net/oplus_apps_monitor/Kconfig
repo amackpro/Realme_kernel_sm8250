@@ -1,0 +1,5 @@
+config OPLUS_APP_MONITOR
+        tristate "app monitor kernel config by oplus"
+        default n
+        ---help---
+          cpu sched for heavy load process.

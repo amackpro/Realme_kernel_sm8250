@@ -16,4 +16,4 @@
 #**
 #************************************************************************************/
 
-obj-y += oplus_router_boost.o
+obj-$(CONFIG_OPLUS_FEATURE_WIFI_SLA) += oplus_router_boost.o
